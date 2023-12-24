@@ -12,6 +12,9 @@ from boxmot.utils import ROOT, WEIGHTS
 from boxmot.utils.checks import TestRequirements
 from examples.detectors import get_yolo_inferer
 
+from examples.detectors.custom import CustomTracker
+
+
 __tr = TestRequirements()
 __tr.check_packages(('ultralytics @ git+https://github.com/mikel-brostrom/ultralytics.git', ))  # install
 
@@ -87,15 +90,20 @@ def run(args):
 
     yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
 
+
     if 'yolov8' not in str(args.yolo_model):
         # replace yolov8 model
-        m = get_yolo_inferer(args.yolo_model)
-        model = m(
-            model=args.yolo_model,
-            device=yolo.predictor.device,
-            args=yolo.predictor.args
-        )
-        yolo.predictor.model = model
+        yolo = CustomTracker('custom.pt')
+
+    # if 'yolov8' not in str(args.yolo_model):
+    #     # replace yolov8 model
+    #     m = get_yolo_inferer(args.yolo_model)
+    #     model = m(
+    #         model=args.yolo_model,
+    #         device=yolo.predictor.device,
+    #         args=yolo.predictor.args
+    #     )
+    #     yolo.predictor.model = model
 
     # store custom args in predictor
     yolo.predictor.custom_args = args
