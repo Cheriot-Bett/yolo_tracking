@@ -1,11 +1,12 @@
-# Mikel Broström 🔥 Yolo Tracking 🧾 AGPL-3.0 license
+
 
 import argparse
 from functools import partial
 from pathlib import Path
+import numpy as np
 
 import torch
-
+import cv2 
 from boxmot import TRACKERS
 from boxmot.tracker_zoo import create_tracker
 from boxmot.utils import ROOT, WEIGHTS
@@ -13,6 +14,9 @@ from boxmot.utils.checks import TestRequirements
 from examples.detectors import get_yolo_inferer
 
 #from examples.detectors.custom import CustomTracker
+
+
+
 
 
 __tr = TestRequirements()
@@ -23,6 +27,23 @@ from ultralytics.data.utils import VID_FORMATS
 from ultralytics.utils.plotting import save_one_box
 
 from examples.utils import write_mot_results
+
+
+
+# Define the polygon vertices
+#polygon = np.array([[50, 50], [200, 50], [200, 200], [50, 200]])
+# Draw the polygon on a black image
+#img = np.zeros((300, 300, 3), dtype=np.uint8)
+#cv2.fillPoly(img, [polygon], (255, 255, 255))
+# Define the center of a detected object
+#cx, cy = 150, 150
+# Check if the center is inside the polygon
+#dist = cv2.pointPolygonTest(polygon, (cx, cy), False)
+#if dist >= 0:
+ #   print('Inside')
+#else:
+ #   print('Outside')
+    
 
 
 def on_predict_start(predictor, persist=False):
@@ -108,7 +129,29 @@ def run(args):
     # store custom args in predictor
     yolo.predictor.custom_args = args
 
+   
+    polygon = np.array([[50, 50], [1000, 50], [1000, 600], [50, 600]])
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    fontScale = 3
+    thickness = 3
+    org= (100,100)
+
     for frame_idx, r in enumerate(results):
+        # draw the polygon
+        color=(0,255,0)
+        orig_frame = r.orig_img
+        h, w, _ = orig_frame.shape
+        print('h', h)
+        print('w', w)
+        
+        # area_1 = [(w-1415, h-100),(w-385, h-100),(w-600, h-500),(w-1280, h-500)]
+        cv2.polylines(orig_frame, [np.array(polygon, np.int32)], True, color, 10)
+
+         # Display the image with the polygon
+        #cv2.imshow('Polygon', orig_frame)
+        cv2.putText(orig_frame, str('name'),(200,1000), font, 
+                        fontScale, color, thickness, cv2.LINE_AA)
+
 
         if r.boxes.data.shape[1] == 7:
 
@@ -137,8 +180,48 @@ def run(args):
                             str(int(d.cls.cpu().numpy().item())) /
                             str(int(d.id.cpu().numpy().item())) / f'{frame_idx}.jpg'
                         ),
-                        BGR=True
-                    )
+                         
+                    BGR=True
+                )
+  
+        # Modify the code here
+        # Initialize the tracked dictionary
+        tracked = {}
+        # Initialize the counted set
+        counted = set()
+        # Initialize the flag
+        left_roi = False
+        # Loop over the detected objects
+        for obj in r.boxes:
+            # Get the class name and id of the object
+            class_name = obj.data[0, 0].item()
+            obj_id =    obj.data[0, 1]
+            x_min, y_min, x_max, y_max = obj.data[0, 2:6]
+           # print('class', class_name)
+           #print('id', obj_id)
+
+            # Calculate the center coordinates
+            cx = int((x_min + x_max) / 2)
+            cy = int((y_min + y_max) / 2)
+            # Check if the center is inside the rectangle
+            dist = cv2.pointPolygonTest(polygon, (cx, cy), False)
+            if  dist >= 0:
+                # If the object is inside the rectangle, add it to the tracked dictionary
+                tracked[obj_id] = class_name
+                # Reset the flag
+                left_roi = False
+            else:
+                # If the object is outside the rectangle, check if it was tracked before
+                if obj_id in tracked:
+                   # If the object was tracked before, add it to the counted set
+                   counted.add((obj_id, tracked[obj_id]))
+                   # Remove it from the tracked dictionary
+                   del tracked[obj_id]
+                   # Set the flag
+                   left_roi = True
+        # If the flag is True, print the counts
+        if left_roi:
+          print('Counts:', len(counted))                     
 
     if args.save_mot:
         print(f'MOT results saved to {yolo.predictor.mot_txt_path}')
