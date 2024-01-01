@@ -1,22 +1,25 @@
 
-
 import argparse
 from functools import partial
 from pathlib import Path
-import numpy as np
 
 import torch
-import cv2 
+
 from boxmot import TRACKERS
 from boxmot.tracker_zoo import create_tracker
 from boxmot.utils import ROOT, WEIGHTS
 from boxmot.utils.checks import TestRequirements
 from examples.detectors import get_yolo_inferer
 
-#from examples.detectors.custom import CustomTracker
-
-
-
+from functools import partial
+from pathlib import Path
+import cv2
+import numpy as np
+from pathlib import Path
+import torch
+from functools import partial
+from boxmot import DeepOCSORT, TRACKERS, create_tracker
+from boxmot.utils import ROOT, WEIGHTS
 
 
 __tr = TestRequirements()
@@ -25,27 +28,9 @@ __tr.check_packages(('ultralytics @ git+https://github.com/mikel-brostrom/ultral
 from ultralytics import YOLO
 from ultralytics.data.utils import VID_FORMATS
 from ultralytics.utils.plotting import save_one_box
-
 from examples.utils import write_mot_results
 
-
-
-# Define the polygon vertices
-#polygon = np.array([[50, 50], [200, 50], [200, 200], [50, 200]])
-# Draw the polygon on a black image
-#img = np.zeros((300, 300, 3), dtype=np.uint8)
-#cv2.fillPoly(img, [polygon], (255, 255, 255))
-# Define the center of a detected object
-#cx, cy = 150, 150
-# Check if the center is inside the polygon
-#dist = cv2.pointPolygonTest(polygon, (cx, cy), False)
-#if dist >= 0:
- #   print('Inside')
-#else:
- #   print('Outside')
-    
-
-
+print('tracksss') 
 def on_predict_start(predictor, persist=False):
     """
     Initialize trackers for object tracking during prediction.
@@ -77,102 +62,111 @@ def on_predict_start(predictor, persist=False):
         if hasattr(tracker, 'model'):
             tracker.model.warmup()
         trackers.append(tracker)
-
+    print('tracks')  
     predictor.trackers = trackers
 
 
 @torch.no_grad()
 def run(args):
 
-    yolo = YOLO(
-        args.yolo_model if 'yolov8' in str(args.yolo_model) else 'yolov8n.pt',
-    )
+    yolo = YOLO(args.yolo_model if 'yolov8' in str(args.yolo_model) else 'yolov8n.pt')
 
+
+    print('im') 
     results = yolo.track(
-        source=args.source,
-        conf=args.conf,
-        iou=args.iou,
-        show=args.show,
-        stream=True,
-        device=args.device,
-        show_conf=args.show_conf,
-        save_txt=args.save_txt,
-        show_labels=args.show_labels,
-        save=args.save,
-        verbose=args.verbose,
-        exist_ok=args.exist_ok,
-        project=args.project,
-        name=args.name,
-        classes=args.classes,
-        imgsz=args.imgsz,
-        vid_stride=args.vid_stride,
-        line_width=args.line_width
-    )
+           source= im,
+           conf=args.conf,
+           iou=args.iou,
+           show=args.show,
+           stream=True,
+           device=args.device,
+           show_conf=args.show_conf,
+           save_txt=args.save_txt,
+           show_labels=args.show_labels,
+           save=args.save,
+           verbose=args.verbose,
+           exist_ok=args.exist_ok,
+           project=args.project,
+           name=args.name,
+           classes=args.classes,
+           imgsz=args.imgsz,
+           vid_stride=args.vid_stride,
+           line_width=args.line_width
+           )
+    print('am') 
 
     yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
-
-
-    # if 'yolov8' not in str(args.yolo_model):
-    #     # replace yolov8 model
-    #     yolo = CustomTracker('custom.pt')
-
     if 'yolov8' not in str(args.yolo_model):
         # replace yolov8 model
         m = get_yolo_inferer(args.yolo_model)
         model = m(
-            model=args.yolo_model,
-            device=yolo.predictor.device,
-            args=yolo.predictor.args
-        )
+              model=args.yolo_model,
+              device=yolo.predictor.device,
+              args=yolo.predictor.args
+              )
         yolo.predictor.model = model
 
-    # store custom args in predictor
+            # store custom args in predictor
     yolo.predictor.custom_args = args
+    print('bm')
+
+
+    # Modified code for video writing
+    output_path = "output_video.avi"  # Change this to the desired output video file path
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # You can change the codec as needed
+    out = cv2.VideoWriter(output_path, fourcc, 30.0, (640, 384))  # Set the frame size (w, h) and frame rate (30.0) accordingly
+    
+   
+
+    # Modified code for video reading
+    vid = cv2.VideoCapture(args.source)
+    color = (0, 0, 255)  # BGR
+    thickness = 2
+    fontscale = 0.5
 
    
-    polygon = np.array([[50, 50], [1000, 50], [1000, 600], [50, 600]])
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    fontScale = 3
-    thickness = 3
-    org= (100,100)
 
-    for frame_idx, r in enumerate(results):
-        # draw the polygon
-        color=(0,255,0)
-        orig_frame = r.orig_img
-        h, w, _ = orig_frame.shape
-        print('h', h)
-        print('w', w)
+
+    while True:
+        ret, im = vid.read()
+        # Check if the frame is successfully read
+        if ret:
+           # Get the frame width and height
+           h, w, _ = im.shape
+           print('Frame Width:', w)
+           print('Frame Height:', h)
         
-        # area_1 = [(w-1415, h-100),(w-385, h-100),(w-600, h-500),(w-1280, h-500)]
-        cv2.polylines(orig_frame, [np.array(polygon, np.int32)], True, color, 10)
 
-         # Display the image with the polygon
-        #cv2.imshow('Polygon', orig_frame)
-        cv2.putText(orig_frame, str('name'),(200,1000), font, 
-                        fontScale, color, thickness, cv2.LINE_AA)
+           polygon = np.array([[w-1820, h-100],  [w-100, h-100], [w-100, h-800], [w-1820, h-700]])          
+           cv2. polylines(im, [np.array(polygon, np.int32)], True,(0,0,255), 5)
+
+          
 
 
-        if r.boxes.data.shape[1] == 7:
 
-            if yolo.predictor.source_type.webcam or args.source.endswith(VID_FORMATS):
-                p = yolo.predictor.save_dir / 'mot' / (args.source + '.txt')
-                yolo.predictor.mot_txt_path = p
-            elif 'MOT16' or 'MOT17' or 'MOT20' in args.source:
-                p = yolo.predictor.save_dir / 'mot' / (Path(args.source).parent.name + '.txt')
-                yolo.predictor.mot_txt_path = p
+           for frame_idx, r in enumerate(results):
 
-            if args.save_mot:
-                write_mot_results(
+              if r.boxes.data.shape[1] == 7:
+
+                if yolo.predictor.source_type.webcam or args.source.endswith(VID_FORMATS):
+                   p = yolo.predictor.save_dir / 'mot' / (args.source + '.txt')
+                   yolo.predictor.mot_txt_path = p
+                elif 'MOT16' or 'MOT17' or 'MOT20' in args.source:
+                   p = yolo.predictor.save_dir / 'mot' / (Path(args.source).parent.name + '.txt')
+                   yolo.predictor.mot_txt_path = p
+
+                if args.save_mot:
+                   write_mot_results(
                     yolo.predictor.mot_txt_path,
                     r,
                     frame_idx,
-                )
+                    )
+                 # pass
 
-            if args.save_id_crops:
-                for d in r.boxes:
-                    print('args.save_id_crops', d.data)
-                    save_one_box(
+                if args.save_id_crops:
+                   for d in r.boxes:
+                      print('args.save_id_crops', d.data)
+                      save_one_box(
                         d.xyxy,
                         r.orig_img.copy(),
                         file=(
@@ -180,55 +174,83 @@ def run(args):
                             str(int(d.cls.cpu().numpy().item())) /
                             str(int(d.id.cpu().numpy().item())) / f'{frame_idx}.jpg'
                         ),
-                         
-                    BGR=True
-                )
-  
-        # Modify the code here
-        # Initialize the tracked dictionary
-        tracked = {}
-        # Initialize the counted set
-        counted = set()
-        # Initialize the flag
-        left_roi = False
-        # Loop over the detected objects
-        for obj in r.boxes:
-            # Get the class name and id of the object
-            class_name = obj.data[0, 0].item()
-            obj_id =    obj.data[0, 1]
-            x_min, y_min, x_max, y_max = obj.data[0, 2:6]
-           # print('class', class_name)
-           #print('id', obj_id)
+                        BGR=True
+                    )
+                  #pass
 
-            # Calculate the center coordinates
-            cx = int((x_min + x_max) / 2)
-            cy = int((y_min + y_max) / 2)
-            # Check if the center is inside the rectangle
-            dist = cv2.pointPolygonTest(polygon, (cx, cy), False)
-            if  dist >= 0:
-                # If the object is inside the rectangle, add it to the tracked dictionary
-                tracked[obj_id] = class_name
-                # Reset the flag
-                left_roi = False
-            else:
-                # If the object is outside the rectangle, check if it was tracked before
-                if obj_id in tracked:
-                   # If the object was tracked before, add it to the counted set
-                   counted.add((obj_id, tracked[obj_id]))
-                   # Remove it from the tracked dictionary
-                   del tracked[obj_id]
-                   # Set the flag
-                   left_roi = True
-        # If the flag is True, print the counts
-        if left_roi:
-          print('Counts:', len(counted))                     
+                print('cm')  
 
-    if args.save_mot:
-        print(f'MOT results saved to {yolo.predictor.mot_txt_path}')
+              # Modify the code here
+              # Initialize the tracked dictionary
+              tracked = {}
+              # Initialize the counted set
+              counted = set()
+              # Initialize the flag
+              left_roi = False
+              # Loop over the detected objects
+              for obj in r.boxes:
+                 print('dm')
+                 # Get the class name and id of the object
+                 class_name = obj.data[0, 0]
+                 obj_id =    obj.data[0, 1]
+                 x_min, y_min, x_max, y_max = obj.data[0, 2:6]
+
+                 # Calculate the center coordinates
+                 cx = int((x_min + x_max) / 2)
+                 cy = int((y_min + y_max) / 2)
+                 # Check if the center is inside the rectangle
+                 dist = cv2.pointPolygonTest(polygon, (cx, cy), False)
+                 if  dist >= 0:
+                    # If the object is inside the rectangle, add it to the tracked dictionary
+                    tracked[obj_id] = class_name
+                    # Reset the flag
+                    left_roi = False
+                 else:
+                    # If the object is outside the rectangle, check if it was tracked before
+                    if obj_id in tracked:
+                       # If the object was tracked before, add it to the counted set
+                       counted.add((obj_id, tracked[obj_id]))
+                       print('length', len(counted))
+                       # Remove it from the tracked dictionary
+                       del tracked[obj_id]
+                       print('length',len(tracked))
+                       # Set the flag
+                       left_roi = True
+                       # If the flag is True, print the counts
+                    if left_roi:
+                      print('Counts:', len(counted))                   
+                    
+           print('em') 
+           if args.save_mot:
+            #pass
+             print(f'MOT results saved to {yolo.predictor.mot_txt_path}')
+
+
+
+        #cv2.imshow('frame', im) 
+
+        # break on pressing q
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        
+        if not ret:
+          break
+
+        print('fm')
+        out.write(im)
+
+
+   
+
+
+    
+    vid.release()
+    cv2.destroyAllWindows()
 
 
 def parse_opt():
     parser = argparse.ArgumentParser()
+
     parser.add_argument('--yolo-model', type=Path, default=WEIGHTS / 'yolov8n',
                         help='yolo model path')
     parser.add_argument('--reid-model', type=Path, default=WEIGHTS / 'osnet_x0_25_msmt17.pt',
@@ -247,7 +269,7 @@ def parse_opt():
                         help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--show', action='store_true',
                         help='display tracking video results')
-    parser.add_argument('--save', action='store_true',
+    parser.add_argument('--save', action='store_false',
                         help='save video tracking results')
     # class 0 is person, 1 is bycicle, 2 is car... 79 is oven
     parser.add_argument('--classes', nargs='+', type=int,
@@ -262,7 +284,7 @@ def parse_opt():
                         help='use FP16 half-precision inference')
     parser.add_argument('--vid-stride', type=int, default=1,
                         help='video frame-rate stride')
-    parser.add_argument('--show-labels', action='store_false',
+    parser.add_argument('--show-labels', action='store_true',
                         help='either show all or only bboxes')
     parser.add_argument('--show-conf', action='store_false',
                         help='hide confidences when show')
@@ -276,14 +298,13 @@ def parse_opt():
                         help='The line width of the bounding boxes. If None, it is scaled to the image size.')
     parser.add_argument('--per-class', default=False, action='store_true',
                         help='not mix up classes when tracking')
-    parser.add_argument('--verbose', default=True, action='store_true',
+    parser.add_argument('--verbose', default=False, action='store_true',
                         help='print results per frame')
     parser.add_argument('--vid_stride', default=1, type=int,
                         help='video frame-rate stride')
 
     opt = parser.parse_args()
     return opt
-
 
 if __name__ == "__main__":
     opt = parse_opt()
