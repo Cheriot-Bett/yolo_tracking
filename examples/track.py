@@ -1,4 +1,3 @@
-
 import argparse
 from functools import partial
 from pathlib import Path
@@ -30,24 +29,16 @@ from ultralytics.data.utils import VID_FORMATS
 from ultralytics.utils.plotting import save_one_box
 from examples.utils import write_mot_results
 
+
+
+
 print('tracksss') 
 def on_predict_start(predictor, persist=False):
-    """
-    Initialize trackers for object tracking during prediction.
-
-    Args:
-        predictor (object): The predictor object to initialize trackers for.
-        persist (bool, optional): Whether to persist the trackers if they already exist. Defaults to False.
-    """
-
+    # Initialization code for trackers
     assert predictor.custom_args.tracking_method in TRACKERS, \
         f"'{predictor.custom_args.tracking_method}' is not supported. Supported ones are {TRACKERS}"
 
-    tracking_config = \
-        ROOT /\
-        'boxmot' /\
-        'configs' /\
-        (predictor.custom_args.tracking_method + '.yaml')
+    tracking_config = ROOT / 'boxmot' / 'configs' / (predictor.custom_args.tracking_method + '.yaml')
     trackers = []
     for i in range(predictor.dataset.bs):
         tracker = create_tracker(
@@ -58,95 +49,53 @@ def on_predict_start(predictor, persist=False):
             predictor.custom_args.half,
             predictor.custom_args.per_class
         )
-        # motion only modeles do not have
         if hasattr(tracker, 'model'):
             tracker.model.warmup()
         trackers.append(tracker)
-    print('tracks')  
     predictor.trackers = trackers
-
 
 @torch.no_grad()
 def run(args):
-
-    yolo = YOLO(args.yolo_model if 'yolov8' in str(args.yolo_model) else 'yolov8n.pt')
-
-
-    print('im') 
-    results = yolo.track(
-           source= im,
-           conf=args.conf,
-           iou=args.iou,
-           show=args.show,
-           stream=True,
-           device=args.device,
-           show_conf=args.show_conf,
-           save_txt=args.save_txt,
-           show_labels=args.show_labels,
-           save=args.save,
-           verbose=args.verbose,
-           exist_ok=args.exist_ok,
-           project=args.project,
-           name=args.name,
-           classes=args.classes,
-           imgsz=args.imgsz,
-           vid_stride=args.vid_stride,
-           line_width=args.line_width
-           )
-    print('am') 
-
-    yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
-    if 'yolov8' not in str(args.yolo_model):
-        # replace yolov8 model
-        m = get_yolo_inferer(args.yolo_model)
-        model = m(
-              model=args.yolo_model,
-              device=yolo.predictor.device,
-              args=yolo.predictor.args
-              )
-        yolo.predictor.model = model
-
-            # store custom args in predictor
-    yolo.predictor.custom_args = args
-    print('bm')
-
-
-    # Modified code for video writing
-    output_path = "output_video.avi"  # Change this to the desired output video file path
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # You can change the codec as needed
-    out = cv2.VideoWriter(output_path, fourcc, 30.0, (640, 384))  # Set the frame size (w, h) and frame rate (30.0) accordingly
-    
-   
-
-    # Modified code for video reading
     vid = cv2.VideoCapture(args.source)
     color = (0, 0, 255)  # BGR
     thickness = 2
     fontscale = 0.5
 
-   
+    yolo = YOLO(args.yolo_model if 'yolov8' in str(args.yolo_model) else 'yolov8n.pt')
+    yolo.add_callback('on_predict_start', partial(on_predict_start, persist=True))
 
+    if 'yolov8' not in str(args.yolo_model):
+        m = get_yolo_inferer(args.yolo_model)
+        model = m(
+              model=args.yolo_model,
+              device=yolo.predictor.device,
+              args=yolo.predictor.args
+        )
+        yolo.predictor.model = model
+
+    yolo.predictor.custom_args = args
+
+    # Initialize video writer
+    output_path = "output_video.avi"
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(output_path, fourcc, 30.0, (640, 384))
 
     while True:
         ret, im = vid.read()
-        # Check if the frame is successfully read
-        if ret:
-           # Get the frame width and height
-           h, w, _ = im.shape
-           print('Frame Width:', w)
-           print('Frame Height:', h)
         
+        if not ret:
+            break
 
-           polygon = np.array([[w-1820, h-100],  [w-100, h-100], [w-100, h-800], [w-1820, h-700]])          
-           cv2. polylines(im, [np.array(polygon, np.int32)], True,(0,0,255), 5)
+        h, w, _ = im.shape
+        polygon = np.array([[w-1820, h-100],  [w-100, h-100], [w-100, h-800], [w-1820, h-700]])
+        cv2.polylines(im, [np.array(polygon, np.int32)], True, (0, 0, 255), 5)
 
-          
+        results = yolo.track(im, conf=args.conf, iou=args.iou, show=args.show, stream=True)
+
+        for frame_idx, r in enumerate(results):
+            if r.boxes.data.shape[1] == 7:
 
 
-
-           for frame_idx, r in enumerate(results):
-
-              if r.boxes.data.shape[1] == 7:
 
                 if yolo.predictor.source_type.webcam or args.source.endswith(VID_FORMATS):
                    p = yolo.predictor.save_dir / 'mot' / (args.source + '.txt')
@@ -179,21 +128,23 @@ def run(args):
                   #pass
 
                 print('cm')  
-
-              # Modify the code here
+                # Your existing code for processing results
+            
+             # Modify the code here
               # Initialize the tracked dictionary
-              tracked = {}
+            tracked = {}
               # Initialize the counted set
-              counted = set()
+            counted = set()
               # Initialize the flag
-              left_roi = False
+            left_roi = False
               # Loop over the detected objects
-              for obj in r.boxes:
+            for obj in r.boxes:
                  print('dm')
                  # Get the class name and id of the object
-                 class_name = obj.data[0, 0]
-                 obj_id =    obj.data[0, 1]
+                 class_name = obj.data[0, 0].item()
+                 obj_id =    obj.data[0, 1].item()
                  x_min, y_min, x_max, y_max = obj.data[0, 2:6]
+                 print('id',obj_id)
 
                  # Calculate the center coordinates
                  cx = int((x_min + x_max) / 2)
@@ -218,35 +169,19 @@ def run(args):
                        left_roi = True
                        # If the flag is True, print the counts
                     if left_roi:
-                      print('Counts:', len(counted))                   
-                    
-           print('em') 
-           if args.save_mot:
-            #pass
-             print(f'MOT results saved to {yolo.predictor.mot_txt_path}')
+                      print('Counts:', len(counted))  
+ 
 
+        #cv2.imshow('frame', im)
 
-
-        #cv2.imshow('frame', im) 
-
-        # break on pressing q
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        
-        if not ret:
-          break
 
-        print('fm')
         out.write(im)
 
-
-   
-
-
-    
     vid.release()
+    out.release()
     cv2.destroyAllWindows()
-
 
 def parse_opt():
     parser = argparse.ArgumentParser()
@@ -269,7 +204,7 @@ def parse_opt():
                         help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--show', action='store_true',
                         help='display tracking video results')
-    parser.add_argument('--save', action='store_false',
+    parser.add_argument('--save', action='store_true',
                         help='save video tracking results')
     # class 0 is person, 1 is bycicle, 2 is car... 79 is oven
     parser.add_argument('--classes', nargs='+', type=int,
@@ -280,11 +215,11 @@ def parse_opt():
                         help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true',
                         help='existing project/name ok, do not increment')
-    parser.add_argument('--half', action='store_true',
+    parser.add_argument('--half', action='store_false',
                         help='use FP16 half-precision inference')
     parser.add_argument('--vid-stride', type=int, default=1,
                         help='video frame-rate stride')
-    parser.add_argument('--show-labels', action='store_true',
+    parser.add_argument('--show-labels', action='store_false',
                         help='either show all or only bboxes')
     parser.add_argument('--show-conf', action='store_false',
                         help='hide confidences when show')
@@ -298,7 +233,7 @@ def parse_opt():
                         help='The line width of the bounding boxes. If None, it is scaled to the image size.')
     parser.add_argument('--per-class', default=False, action='store_true',
                         help='not mix up classes when tracking')
-    parser.add_argument('--verbose', default=False, action='store_true',
+    parser.add_argument('--verbose', default=True, action='store_true',
                         help='print results per frame')
     parser.add_argument('--vid_stride', default=1, type=int,
                         help='video frame-rate stride')
