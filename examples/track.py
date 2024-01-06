@@ -54,6 +54,9 @@ def on_predict_start(predictor, persist=False):
         trackers.append(tracker)
     predictor.trackers = trackers
 
+
+
+
 @torch.no_grad()
 def run(args):
     vid = cv2.VideoCapture(args.source)
