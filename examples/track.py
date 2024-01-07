@@ -79,6 +79,8 @@ def run(args):
     yolo.predictor.custom_args = args
 
     # Initialize video writer
+
+    
     output_path = "output_video.avi"
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     out = cv2.VideoWriter(output_path, fourcc, 30.0, (640, 384))
