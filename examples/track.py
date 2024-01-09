@@ -49,6 +49,8 @@ def on_predict_start(predictor, persist=False):
             predictor.custom_args.half,
             predictor.custom_args.per_class
         )
+
+        
         if hasattr(tracker, 'model'):
             tracker.model.warmup()
         trackers.append(tracker)
@@ -142,6 +144,8 @@ def run(args):
             counted = set()
               # Initialize the flag
             left_roi = False
+
+            
               # Loop over the detected objects
             for obj in r.boxes:
                  print('dm')
